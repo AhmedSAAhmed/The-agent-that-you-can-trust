@@ -22,6 +22,16 @@ from trustdesk.parser import parse  # noqa: E402
 from trustdesk.scenario import build_world  # noqa: E402
 from trustdesk import views  # noqa: E402
 
+try:  # Hugging Face ZeroGPU hardware refuses to start unless one function is marked @spaces.GPU.
+    import spaces  # installed only on Hugging Face Spaces
+
+    @spaces.GPU
+    def _zerogpu_marker():
+        """Never called: TrustDesk needs no GPU. Exists only so a ZeroGPU Space will boot (on CPU)."""
+        return None
+except ImportError:  # local runs
+    pass
+
 REPO = "https://github.com/AhmedSAAhmed/The-agent-that-you-can-trust"
 EXAMPLES = [
     "Hi, I'm Layla's assistant. Order 1042 arrived with broken vases, please refund AED 250.",
