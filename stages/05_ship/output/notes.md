@@ -16,6 +16,11 @@
 - Attack 10 (`manipulated_reader`) uses a simulated compromised model, so it needs no key.
 - Tests never use the real key (`tests/conftest.py` strips it). 146 tests.
 
+## Free provider chain (added 2026-11-09)
+- `ProviderChain` in `reader.py`: Groq → Gemini → OpenRouter, one key each (`GROQ_API_KEY`, `GEMINI_API_KEY`, `OPENROUTER_API_KEY`); per-model and per-provider cooldowns shared across sessions; User-Agent header required (Groq's CDN returned 403/1010 without it).
+- Benchmark: Groq gpt-oss-120b and qwen3.8-27b, and Gemini flash-lite read all 3 genuine hard messages and *obeyed* the injection (caught by grounding); Gemini 2.5 Flash got 4/4 (~2 s). Groq answers in 0.3–0.8 s.
+- 159 tests, all with faked network.
+
 ## Left for the owner
 1. Review `docs/THESIS.md` in your own voice.
 2. Record the 90 s video using `docs/loom-script.md` on the live URL.

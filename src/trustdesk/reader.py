@@ -119,7 +119,8 @@ class OpenRouterClient:
         req = urllib.request.Request(
             OPENROUTER_URL, data=json.dumps(payload).encode(), method="POST",
             headers={"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json",
-                     "HTTP-Referer": "https://huggingface.co/spaces/SalQ/TrustDesk", "X-Title": "TrustDesk"},
+                     "HTTP-Referer": "https://huggingface.co/spaces/SalQ/TrustDesk", "X-Title": "TrustDesk",
+                     "User-Agent": USER_AGENT},
         )
         with urllib.request.urlopen(req, timeout=self.timeout) as resp:
             data = json.loads(resp.read().decode())
@@ -128,6 +129,150 @@ class OpenRouterClient:
         if not isinstance(content, str) or not content.strip():
             raise ValueError("the model returned an empty answer")
         return content
+
+
+# ---------------------------------------------------------------- free provider chain
+USER_AGENT = "TrustDesk/0.1 (+https://huggingface.co/spaces/SalQ/TrustDesk)"  # Groq's CDN blocks Python's default
+
+
+def clean_key(var: str) -> str | None:
+    """Read an API key from the environment, tolerating quotes; refuse hidden or non-ASCII characters."""
+    key = os.environ.get(var, "").strip().strip("\"'“”‘’").strip()
+    if not key:
+        return None
+    if not all(33 <= ord(ch) <= 126 for ch in key):
+        raise ValueError(f"{var} contains hidden or non-ASCII characters; paste it again as plain text")
+    return key
+
+
+@dataclass
+class Provider:
+    """One OpenAI-compatible free tier. `extras` maps model -> provider-specific request fields."""
+
+    name: str
+    url: str
+    key: str
+    models: list[str]
+    extras: dict = field(default_factory=dict)
+    send_model_list: bool = False  # OpenRouter takes the whole list and falls through it server-side
+    headers: dict = field(default_factory=dict)
+
+
+# (env var for the key, env var to override models, provider name, endpoint, default models, per-model extras)
+# Defaults chosen by benchmark on 2026-11-09 (see stages/05_ship/output/notes.md).
+PROVIDER_SPECS = [
+    ("GROQ_API_KEY", "GROQ_MODELS", "Groq", "https://api.groq.com/openai/v1/chat/completions",
+     ["openai/gpt-oss-120b", "qwen/qwen3.8-27b"],
+     {"openai/gpt-oss-120b": {"reasoning_effort": "low"}, "openai/gpt-oss-20b": {"reasoning_effort": "low"},
+      "qwen/qwen3.8-27b": {"reasoning_format": "hidden"}}),
+    ("GEMINI_API_KEY", "GEMINI_MODELS", "Gemini", "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+     ["gemini-2.5-flash", "gemini-flash-lite-latest"],
+     {"gemini-2.5-flash": {"reasoning_effort": "low"}}),
+    ("OPENROUTER_API_KEY", "OPENROUTER_MODEL", "OpenRouter", OPENROUTER_URL,
+     DEFAULT_MODELS, {"*": {"reasoning": {"effort": "low", "exclude": True}}}),
+]
+
+# Shared across sessions: quotas belong to the key, not to one visitor. key = "provider" or "provider:model".
+_PROVIDER_COOLDOWN: dict[str, float] = {}
+
+
+class ChainUnavailable(ValueError):
+    """Every provider in the chain failed or is cooling down."""
+
+
+def _retry_at(exc: urllib.error.HTTPError, body: dict) -> float:
+    after = (exc.headers or {}).get("retry-after") if exc.headers else None
+    try:
+        if after:
+            return time.time() + min(float(after), 6 * 3600)
+    except ValueError:
+        pass
+    reset_ms = (((body.get("error") or {}).get("metadata") or {}).get("headers") or {}).get("X-RateLimit-Reset")
+    if reset_ms:
+        return float(reset_ms) / 1000
+    return time.time() + 60
+
+
+class ProviderChain:
+    """Try free providers in order; a rate-limited model or provider is skipped until its reset."""
+
+    def __init__(self, providers: list[Provider], *, timeout: float = 25.0):
+        self.providers = providers
+        self.timeout = timeout
+        self.name = " → ".join(p.name for p in providers)
+        self.last_errors: list[str] = []
+
+    @classmethod
+    def from_env(cls) -> "ProviderChain | None":
+        providers = []
+        for key_var, models_var, name, url, models, extras in PROVIDER_SPECS:
+            key = clean_key(key_var)
+            if not key:
+                continue
+            override = [m.strip() for m in os.environ.get(models_var, "").split(",") if m.strip()]
+            extra_headers = {"HTTP-Referer": "https://huggingface.co/spaces/SalQ/TrustDesk", "X-Title": "TrustDesk"} \
+                if name == "OpenRouter" else {}
+            providers.append(Provider(name, url, key, override or list(models), extras,
+                                      send_model_list=(name == "OpenRouter"), headers=extra_headers))
+        return cls(providers) if providers else None
+
+    def describe(self) -> str:
+        return " → ".join(f"{p.name} ({', '.join(p.models[:2])}{'…' if len(p.models) > 2 else ''})" for p in self.providers)
+
+    def _call(self, p: Provider, model: str, system: str, user: str) -> str:
+        payload: dict = {
+            "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
+            "temperature": 0, "max_tokens": 1500, "response_format": {"type": "json_object"},
+            **p.extras.get("*", {}), **p.extras.get(model, {}),
+        }
+        if p.send_model_list:
+            payload["models"] = p.models
+        else:
+            payload["model"] = model
+        req = urllib.request.Request(
+            p.url, data=json.dumps(payload).encode(), method="POST",
+            headers={"Authorization": f"Bearer {p.key}", "Content-Type": "application/json",
+                     "User-Agent": USER_AGENT, **p.headers})
+        with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+            data = json.loads(resp.read().decode())
+        content = (data.get("choices") or [{}])[0].get("message", {}).get("content")
+        if not isinstance(content, str) or not content.strip():
+            raise ValueError("empty answer")
+        self.name = f"{p.name} · {data.get('model') or model}"
+        return content
+
+    def complete(self, system: str, user: str) -> str:
+        errors: list[str] = []
+        now = time.time()
+        for p in self.providers:
+            if _PROVIDER_COOLDOWN.get(p.name, 0) > now:
+                errors.append(f"{p.name} paused")
+                continue
+            for model in ([p.models[0]] if p.send_model_list else p.models):
+                tag = f"{p.name}:{model}"
+                if _PROVIDER_COOLDOWN.get(tag, 0) > now:
+                    errors.append(f"{p.name} {model} rate-limited")
+                    continue
+                try:
+                    return self._call(p, model, system, user)
+                except urllib.error.HTTPError as exc:
+                    try:
+                        body = json.loads(exc.read().decode() or "{}")
+                    except (ValueError, OSError):
+                        body = {}
+                    if exc.code == 429:
+                        _PROVIDER_COOLDOWN[p.name if p.send_model_list else tag] = _retry_at(exc, body)
+                        errors.append(f"{p.name} {model} rate-limited")
+                    elif exc.code in (401, 402, 403):
+                        _PROVIDER_COOLDOWN[p.name] = now + 600
+                        errors.append(f"{p.name} rejected the key (HTTP {exc.code})")
+                        break
+                    else:
+                        errors.append(f"{p.name} {model} HTTP {exc.code}")
+                except (urllib.error.URLError, TimeoutError, OSError, KeyError, IndexError, TypeError, ValueError) as exc:
+                    errors.append(f"{p.name} {model}: {type(exc).__name__ if not isinstance(exc, ValueError) else exc}")
+        self.last_errors = errors
+        raise ChainUnavailable("; ".join(errors[:4]) or "no providers configured")
 
 
 # ---------------------------------------------------------------- grounding
@@ -253,7 +398,12 @@ class Reader:
             return Reading(rules, "rules", checks=[ok("mode", f"rule-based reader ({_http_failure(exc)})")])
         except (urllib.error.URLError, TimeoutError, OSError, KeyError, IndexError, TypeError, ValueError,
                 ValidationError) as exc:
-            reason = type(exc).__name__ if not isinstance(exc, ValidationError) else "output did not match the schema"
+            if isinstance(exc, ValidationError):
+                reason = "output did not match the schema"
+            elif isinstance(exc, ChainUnavailable):
+                reason = str(exc)
+            else:
+                reason = type(exc).__name__
             return Reading(rules, "rules", checks=[ok("mode", f"rule-based reader (AI model unavailable: {reason})")])
 
         grounded, checks = ground(extracted, text, orders)

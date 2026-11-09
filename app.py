@@ -21,7 +21,7 @@ from trustdesk.credentials import CheckResult, issuer_id, verify_credential  # n
 from trustdesk.delegation import scope_of  # noqa: E402
 from trustdesk.identity import DIDError, did_document  # noqa: E402
 from trustdesk.parser import parse  # noqa: E402
-from trustdesk.reader import OpenRouterClient, Reader  # noqa: E402
+from trustdesk.reader import ProviderChain, Reader  # noqa: E402
 from trustdesk.scenario import build_world  # noqa: E402
 from trustdesk import views  # noqa: E402
 
@@ -51,9 +51,9 @@ _load_dotenv(Path(__file__).resolve().parent / ".env")
 
 
 def _new_world():
-    """One world per browser session; the AI reader is on only when OPENROUTER_API_KEY is set."""
+    """One world per browser session; the AI reader is on when any free provider key is set."""
     try:
-        client = OpenRouterClient.from_env()
+        client = ProviderChain.from_env()
     except ValueError:  # malformed key: run on the rule-based reader rather than fail
         client = None
     return build_world(reader=Reader(client))
@@ -63,7 +63,7 @@ def _reader_status(world) -> str:
     client = world.support.reader.client
     if client is None:
         return ("🧠 **Reader:** rule-based (no AI key configured). The policy decides either way; "
-                "add `OPENROUTER_API_KEY` to enable the AI reader.")
+                "add `GROQ_API_KEY`, `GEMINI_API_KEY` or `OPENROUTER_API_KEY` to enable the AI reader.")
     from trustdesk.reader import _COOLDOWN
     import time as _time
     if _time.time() < _COOLDOWN["until"]:
@@ -72,7 +72,8 @@ def _reader_status(world) -> str:
         return (f"🧠 **Reader:** rule-based right now ({views.e(_COOLDOWN['why'])}; the AI reader resumes at {when}). "
                 "Decisions are made the same way either way.")
     left = world.support.reader.max_calls - world.support.reader.calls
-    return (f"🧠 **Reader:** AI model `{views.e(client.name)}`, validated by pydantic and grounded in your message "
+    chain = views.e(client.describe() if hasattr(client, "describe") else client.name)
+    return (f"🧠 **Reader:** free AI chain {chain}, validated by pydantic and grounded in your message "
             f"({left} AI reads left this session, then rule-based). The AI only *reads*; the policy decides.")
 EXAMPLES = [
     "Hi, I'm Layla's assistant. Order 1042 arrived with broken vases, please refund AED 250.",

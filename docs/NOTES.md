@@ -25,7 +25,7 @@
 ## AI tools used
 
 - **Claude Code (Anthropic, Claude Opus 5.5)** pair-programmed the build: architecture, implementation, tests, the UI theme and these docs, with the author directing scope, the scenario and design decisions.
-- **OpenRouter** (optional, at runtime, free models only): an AI model reads free-text messages. Default list `recursive/flint-v1.0:free` → `liquid/lfm-3-1.7b:free` → `nvidia/nemotron-3.5-super-vl:free`, chosen by benchmark. Free models can be slow or rate-limited; then the rule-based reader takes over.
+- **Free AI models at runtime (optional):** a chain of free tiers reads free-text messages: **Groq** (`openai/gpt-oss-120b`, `qwen/qwen3.8-27b`) → **Google Gemini** (`gemini-2.5-flash`, `gemini-flash-lite-latest`) → **OpenRouter** free models. Order chosen by benchmark. A rate-limited model is skipped until its reset; if all are busy, the rule-based reader takes over.
 - **Firecrawl** was used for research: the W3C `vc-di-eddsa` test vector, and the reference "Navy" design whose type and palette the UI follows.
 - **icm-architect** (agent skill) shaped the repo's workspace: `AGENTS.md` entry plus numbered stages with checks, so any coding agent can resume the build.
 
@@ -41,7 +41,7 @@
 
 ```bash
 uv sync
-uv run pytest -q                 # 149 tests
+uv run pytest -q                 # 159 tests
 uv run python -m trustdesk.demo  # CLI walkthrough
 uv run python app.py             # UI at http://localhost:7860
 ```

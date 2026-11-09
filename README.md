@@ -33,7 +33,7 @@ Agents will negotiate and transact for people and companies. TrustDesk gives the
 3. **Verification:** signature valid · signer is the issuer · chain reaches a trust anchor · **authority only narrows** at each hand-off · not revoked (**W3C Bitstring Status List**) · message fresh and not replayed · credentials bound to this exact message.
 4. **Policy:** [`policies/support_agent.yaml`](policies/support_agent.yaml) turns verified evidence into accept, refuse or escalate. No LLM in the decision.
 
-**Optional AI reader.** An AI model (via OpenRouter) can read messy free text ("half back on the vase order", Arabic, item names instead of order numbers). Its answer must fit a **pydantic** schema, and every order and amount must be **grounded** in the message or computed from the merchant's own records. Anything ungrounded goes to a human. The AI reads; the policy decides.
+**Optional AI reader.** A chain of free AI models (**Groq → Gemini → OpenRouter**, falling back to rules) can read messy free text ("half back on the vase order", Arabic, item names instead of order numbers). Its answer must fit a **pydantic** schema, and every order and amount must be **grounded** in the message or computed from the merchant's own records. Anything ungrounded goes to a human. The AI reads; the policy decides.
 
 Full write-up with diagrams and the threat model: **[docs/architecture.md](docs/architecture.md)**.
 
@@ -60,12 +60,12 @@ Try them in the **Attack Lab** tab, or run `uv run python -m trustdesk.demo`.
 git clone https://github.com/AhmedSAAhmed/The-agent-that-you-can-trust.git
 cd The-agent-that-you-can-trust
 uv sync
-uv run pytest -q                 # 149 tests
+uv run pytest -q                 # 159 tests
 uv run python -m trustdesk.demo  # CLI walkthrough
 uv run python app.py             # UI at http://localhost:7860
 ```
 
-No API keys or paid services are needed. The optional AI reader turns on when `OPENROUTER_API_KEY` is set (see `.env.example`); without it, a rule-based reader is used and every decision is identical in kind.
+No API keys or paid services are needed. The optional AI reader turns on when any of `GROQ_API_KEY`, `GEMINI_API_KEY` or `OPENROUTER_API_KEY` is set (all free tiers; see `.env.example`). Without them, a rule-based reader is used.
 
 ## Docs
 
@@ -76,7 +76,7 @@ No API keys or paid services are needed. The optional AI reader turns on when `O
 
 ## Repo map
 
-`src/trustdesk/` the trust layer and agents · `policies/` trust policy · `tests/` 149 tests · `app.py` Gradio UI · `stages/` + `AGENTS.md` the build pipeline (ICM workspace), so any coding agent can resume work.
+`src/trustdesk/` the trust layer and agents · `policies/` trust policy · `tests/` 159 tests · `app.py` Gradio UI · `stages/` + `AGENTS.md` the build pipeline (ICM workspace), so any coding agent can resume work.
 
 ## License
 
