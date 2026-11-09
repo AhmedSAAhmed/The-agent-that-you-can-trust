@@ -24,7 +24,9 @@ from pydantic import BaseModel, Field, ValidationError, field_validator
 from .credentials import CheckResult, fail, ok
 from .parser import _DIGITS, ParsedRequest, parse
 
-DEFAULT_MODELS = ["google/gemma-4-31b-it:free", "openrouter/free"]
+# Free models only, best first (benchmarked 2026-11-09 on 4 hard messages: 4/4, 3/4, 3/4).
+# OpenRouter falls through the list when a model is rate-limited or down.
+DEFAULT_MODELS = ["recursive/flint-v1.0:free", "liquid/lfm-3-1.7b:free", "nvidia/nemotron-3.5-super-vl:free"]
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 Intent = Literal["refund.request", "order.lookup", "order.cancel", "human.handoff", "unknown"]
@@ -43,9 +45,9 @@ class ExtractedRequest(BaseModel):
     summary: str = Field(default="", max_length=240)
     suspicious_instructions: list[str] = Field(default_factory=list, max_length=5)
 
-    @field_validator("order")
+    @field_validator("order", mode="before")
     @classmethod
-    def _digits(cls, v: Optional[str]) -> Optional[str]:
+    def _digits(cls, v) -> Optional[str]:  # models sometimes send 1042 instead of "1042"
         if v is None or v == "":
             return None
         v = str(v).strip().lstrip("#").translate(_DIGITS)
@@ -84,7 +86,7 @@ class ModelClient(Protocol):
 class OpenRouterClient:
     """Minimal OpenRouter chat client (stdlib only). The key comes from the environment, never from code."""
 
-    def __init__(self, api_key: str, models: list[str] | None = None, *, timeout: float = 12.0):
+    def __init__(self, api_key: str, models: list[str] | None = None, *, timeout: float = 25.0):
         self.api_key = api_key
         self.models = models or DEFAULT_MODELS
         self.timeout = timeout
@@ -106,7 +108,10 @@ class OpenRouterClient:
             "models": self.models,  # OpenRouter tries them in order
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
             "temperature": 0,
-            "max_tokens": 400,
+            # Free models are often reasoning models: keep their thinking short and out of the reply,
+            # and leave enough budget that the JSON answer still gets written.
+            "max_tokens": 1500,
+            "reasoning": {"effort": "low", "exclude": True},
             "response_format": {"type": "json_object"},
         }
         req = urllib.request.Request(

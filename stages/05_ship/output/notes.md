@@ -12,7 +12,7 @@
 
 ## Optional AI reader (added 2026-11-09)
 - `src/trustdesk/reader.py`: OpenRouter → pydantic `ExtractedRequest` → grounding → policy (`reader_must_be_grounded` escalates). Falls back to `parser.py` with no key, on errors, empty/invalid output, or after 25 AI reads per session.
-- Live-tested: the free `google/gemma-4-31b-it:free` was rate-limited upstream (HTTP 429); `anthropic/claude-haiku-5.5` read all test messages correctly at ~$0.0001 each.
+- Owner chose **free models only**. Benchmark (4 hard messages): flint-v1.0 4/4, lfm-3-1.7b 3/4 (its miss escalated safely), nemotron-3.5-super-vl 3/4, Gemma rate-limited. Fixes needed for free models: `max_tokens` 1500 + `reasoning: {effort: low, exclude: true}` (reasoning models used to burn the budget), and accepting numeric order numbers. Paid alternative tested: `anthropic/claude-haiku-5.5` (all correct, ~$0.0001/msg).
 - Attack 10 (`manipulated_reader`) uses a simulated compromised model, so it needs no key.
 - Tests never use the real key (`tests/conftest.py` strips it). 146 tests.
 

@@ -60,7 +60,7 @@ Try them in the **Attack Lab** tab, or run `uv run python -m trustdesk.demo`.
 git clone https://github.com/AhmedSAAhmed/The-agent-that-you-can-trust.git
 cd The-agent-that-you-can-trust
 uv sync
-uv run pytest -q                 # 146 tests
+uv run pytest -q                 # 147 tests
 uv run python -m trustdesk.demo  # CLI walkthrough
 uv run python app.py             # UI at http://localhost:7860
 ```
@@ -76,7 +76,7 @@ No API keys or paid services are needed. The optional AI reader turns on when `O
 
 ## Repo map
 
-`src/trustdesk/` the trust layer and agents · `policies/` trust policy · `tests/` 146 tests · `app.py` Gradio UI · `stages/` + `AGENTS.md` the build pipeline (ICM workspace), so any coding agent can resume work.
+`src/trustdesk/` the trust layer and agents · `policies/` trust policy · `tests/` 147 tests · `app.py` Gradio UI · `stages/` + `AGENTS.md` the build pipeline (ICM workspace), so any coding agent can resume work.
 
 ## License
 

@@ -45,6 +45,11 @@ def test_grounded_stated_amount():
     assert (r.parsed.order, r.parsed.amount) == ("1042", 250)
 
 
+def test_numeric_order_from_model_is_accepted():
+    r = read(ans(order=1042, amount_basis="stated", amount=250), "refund 250 on 1042")
+    assert r.mode == "ai" and r.parsed.order == "1042"
+
+
 def test_order_found_by_item_description():
     r = read(ans(order="1043", amount_basis="stated", amount=60), "the candle box was crushed, give me 60 back")
     assert r.grounded and r.parsed.order == "1043"
