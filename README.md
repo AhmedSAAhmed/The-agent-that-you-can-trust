@@ -14,7 +14,7 @@ short_description: A trust layer for AI agents (DIDs + Verifiable Credentials)
 
 # TrustDesk: agents that *earn* trust, not scores
 
-**Live demo:** https://huggingface.co/spaces/SalQ/trustdesk · **Code:** https://github.com/AhmedSAAhmed/The-agent-that-you-can-trust
+**Live demo:** https://huggingface.co/spaces/SalQ/TrustDesk · **Code:** https://github.com/AhmedSAAhmed/The-agent-that-you-can-trust
 
 Agents will negotiate and transact for people and companies. TrustDesk gives them a trust layer built on **W3C standards and real signatures**. There is no reputation score: every decision is **signed evidence checked against a readable policy**, with a trace that shows why.
 

@@ -1,6 +1,6 @@
 # Submission notes
 
-**Live demo:** https://huggingface.co/spaces/SalQ/trustdesk
+**Live demo:** https://huggingface.co/spaces/SalQ/TrustDesk
 **Repo:** https://github.com/AhmedSAAhmed/The-agent-that-you-can-trust
 **Architecture:** [architecture.md](architecture.md) · **Thesis:** [THESIS.md](THESIS.md)
 

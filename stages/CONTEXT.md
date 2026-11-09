@@ -1,6 +1,6 @@
 # TrustDesk - the build pipeline
 
-**Status (2026-11-09):** stages 01–04 passed (117 tests, Navy theme; app runs at localhost:7860 via `uv run python app.py`). Next: start `05_ship`.
+**Status (2026-11-09):** stages 01–04 passed; 05 nearly done: live at https://huggingface.co/spaces/SalQ/TrustDesk, docs written. Left: owner reviews the thesis, records the video, submits (see `05_ship/output/notes.md`).
 
 The flow in one line: sign it, reason about it, stage it between agents, show it, ship it.
 

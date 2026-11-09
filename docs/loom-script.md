@@ -1,6 +1,6 @@
 # 90-second video script
 
-Record at **https://huggingface.co/spaces/SalQ/trustdesk**, browser at about 1400 px wide, light mode (`?__theme=light`).
+Record at **https://huggingface.co/spaces/SalQ/TrustDesk**, browser at about 1400 px wide, light mode (`?__theme=light`).
 **Before recording:** open the page fresh, so you start with an empty chat and one new world.
 
 | Time | Screen | Say (roughly) |
