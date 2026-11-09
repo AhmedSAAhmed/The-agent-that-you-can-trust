@@ -41,7 +41,7 @@
 
 ```bash
 uv sync
-uv run pytest -q                 # 147 tests
+uv run pytest -q                 # 149 tests
 uv run python -m trustdesk.demo  # CLI walkthrough
 uv run python app.py             # UI at http://localhost:7860
 ```

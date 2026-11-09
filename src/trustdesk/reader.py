@@ -14,9 +14,11 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Literal, Optional, Protocol
 
 from pydantic import BaseModel, Field, ValidationError, field_validator
@@ -203,6 +205,30 @@ class Reading:
         return all(c.passed for c in self.checks)
 
 
+# Shared by every session in this process: the quota belongs to the API key, not to one visitor.
+_COOLDOWN: dict = {"until": 0.0, "why": ""}
+
+
+def _http_failure(exc: urllib.error.HTTPError) -> str:
+    """Explain an HTTP error and, for quota or key problems, pause AI calls instead of retrying every message."""
+    try:
+        body = json.loads(exc.read().decode() or "{}")
+    except (ValueError, OSError):
+        body = {}
+    err = body.get("error") or {}
+    meta = err.get("metadata") or {}
+    if exc.code == 429:
+        reset_ms = (meta.get("headers") or {}).get("X-RateLimit-Reset")
+        daily = "per-day" in str(err.get("message", "")) or "daily" in str(meta.get("limit_source", ""))
+        _COOLDOWN["until"] = float(reset_ms) / 1000 if reset_ms else time.time() + 300
+        _COOLDOWN["why"] = "the free daily AI quota is used up" if daily else "the AI provider is rate-limiting"
+        return _COOLDOWN["why"]
+    if exc.code in (401, 402, 403):
+        _COOLDOWN["until"], _COOLDOWN["why"] = time.time() + 600, f"the AI provider rejected the key (HTTP {exc.code})"
+        return _COOLDOWN["why"]
+    return f"HTTP {exc.code}"
+
+
 @dataclass
 class Reader:
     client: ModelClient | None = None
@@ -213,6 +239,9 @@ class Reader:
         rules = parse(text)
         if self.client is None:
             return Reading(rules, "rules", checks=[ok("mode", "rule-based reader (no AI model configured)")])
+        if time.time() < _COOLDOWN["until"]:
+            when = datetime.fromtimestamp(_COOLDOWN["until"], timezone.utc).strftime("%H:%M UTC")
+            return Reading(rules, "rules", checks=[ok("mode", f"rule-based reader ({_COOLDOWN['why']}; AI resumes at {when})")])
         if self.calls >= self.max_calls:
             return Reading(rules, "rules", checks=[ok("mode", "rule-based reader (AI budget for this session used up)")])
         self.calls += 1
@@ -220,6 +249,8 @@ class Reader:
         try:
             raw = self.client.complete(SYSTEM_PROMPT.format(orders=catalog), text)
             extracted = ExtractedRequest.model_validate_json(_json_block(raw))
+        except urllib.error.HTTPError as exc:
+            return Reading(rules, "rules", checks=[ok("mode", f"rule-based reader ({_http_failure(exc)})")])
         except (urllib.error.URLError, TimeoutError, OSError, KeyError, IndexError, TypeError, ValueError,
                 ValidationError) as exc:
             reason = type(exc).__name__ if not isinstance(exc, ValidationError) else "output did not match the schema"

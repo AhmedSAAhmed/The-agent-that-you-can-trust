@@ -124,7 +124,7 @@ def hero(repo: str) -> str:
     stats = [("10", "/10", "Attacks defended", "Each caught by a named check"),
              ("0", "", "Scores", "Evidence and policy only"),
              ("4", "", "W3C standards", "DID, VC 2.0, Data Integrity, Status List"),
-             ("147", "", "Tests", "Including the W3C test vector")]
+             ("149", "", "Tests", "Including the W3C test vector")]
     cells = "".join(f"<div class='td-stat'><div class='n'>{n}<span>{u}</span></div><div class='l'>{e(l)}</div>"
                     f"<div class='d'>{e(d)}</div></div>" for n, u, l, d in stats)
     return (f"<div class='td-hero'><div class='td-nav'><span class='td-logo'>TRUSTDESK</span>"

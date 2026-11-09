@@ -110,6 +110,30 @@ def test_bad_model_output_falls_back_to_rules(bad):
     assert (r.parsed.order, r.parsed.amount) == ("1042", 250)
 
 
+def _http_error(code, body):
+    import io
+    return urllib.error.HTTPError("https://openrouter.ai", code, "err", {}, io.BytesIO(json.dumps(body).encode()))
+
+
+def test_daily_quota_pauses_ai_calls_for_everyone():
+    import time
+    reset_ms = int((time.time() + 3600) * 1000)
+    quota = _http_error(429, {"error": {"message": "Rate limit exceeded: free-models-per-day",
+                                        "metadata": {"headers": {"X-RateLimit-Reset": str(reset_ms)}}}})
+    first = Fake(quota)
+    r = Reader(first).read("refund AED 250 for order 1042", ORDERS)
+    assert r.mode == "rules" and "daily AI quota" in r.checks[0].detail
+    second = Fake(ans(order="1042", amount_basis="stated", amount=250))  # a new visitor's session
+    r2 = Reader(second).read("refund AED 250 for order 1042", ORDERS)
+    assert second.calls == 0 and "AI resumes at" in r2.checks[0].detail
+    assert r2.parsed.amount == 250  # rules still read it
+
+
+def test_rejected_key_is_explained():
+    r = Reader(Fake(_http_error(401, {"error": {"message": "No auth credentials found"}}))).read("refund 250 on 1042", ORDERS)
+    assert "rejected the key" in r.checks[0].detail
+
+
 def test_no_client_uses_rules():
     r = Reader().read("refund AED 250 for order 1042", ORDERS)
     assert r.mode == "rules" and r.parsed.amount == 250

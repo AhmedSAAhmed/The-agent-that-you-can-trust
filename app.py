@@ -64,6 +64,13 @@ def _reader_status(world) -> str:
     if client is None:
         return ("🧠 **Reader:** rule-based (no AI key configured). The policy decides either way; "
                 "add `OPENROUTER_API_KEY` to enable the AI reader.")
+    from trustdesk.reader import _COOLDOWN
+    import time as _time
+    if _time.time() < _COOLDOWN["until"]:
+        from datetime import datetime, timezone
+        when = datetime.fromtimestamp(_COOLDOWN["until"], timezone.utc).strftime("%H:%M UTC")
+        return (f"🧠 **Reader:** rule-based right now ({views.e(_COOLDOWN['why'])}; the AI reader resumes at {when}). "
+                "Decisions are made the same way either way.")
     left = world.support.reader.max_calls - world.support.reader.calls
     return (f"🧠 **Reader:** AI model `{views.e(client.name)}`, validated by pydantic and grounded in your message "
             f"({left} AI reads left this session, then rule-based). The AI only *reads*; the policy decides.")
