@@ -1,6 +1,6 @@
 # TrustDesk - the build pipeline
 
-**Status (2026-11-09):** stages 01–03 passed (111 tests; `uv run python -m trustdesk.demo` works). Next: start `04_ui`.
+**Status (2026-11-09):** stages 01–04 passed (117 tests, Navy theme; app runs at localhost:7860 via `uv run python app.py`). Next: start `05_ship`.
 
 The flow in one line: sign it, reason about it, stage it between agents, show it, ship it.
 

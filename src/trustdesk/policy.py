@@ -143,7 +143,14 @@ class Policy:
         if first_failure:
             return done(REFUSE, f"{first_failure.name}: {first_failure.detail}")
 
-        # 2. scope
+        # 2. well-formed request
+        if rule.get("require_amount"):
+            if req.amount <= 0 or not req.order:
+                trace.append(fail("policy.request_complete", "a refund needs an order number and a positive amount"))
+                return done(REFUSE, "the request does not say which order or how much to refund")
+            trace.append(ok("policy.request_complete", f"order #{req.order}, {req.currency} {req.amount:g}"))
+
+        # 3. scope
         if rule.get("within_scope"):
             if ev.delegated_scope is None:
                 trace.append(fail("policy.scope", "no delegated scope"))

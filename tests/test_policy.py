@@ -86,6 +86,12 @@ def test_missing_group_refuses(policy):
     assert evaluate(policy, 50, groups=groups).outcome == REFUSE
 
 
+def test_refund_without_amount_is_refused(policy):
+    d = evaluate(policy, 0)
+    assert d.outcome == REFUSE
+    assert any(c.name == "policy.request_complete" and not c.passed for c in d.trace)
+
+
 def test_unknown_action_refused(policy):
     assert evaluate(policy, 0, action="account.delete").outcome == REFUSE
 

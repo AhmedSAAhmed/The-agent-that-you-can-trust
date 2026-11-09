@@ -22,6 +22,8 @@ actions:
     must_pass: [message, presentation, authority_chain]
     # The request must fit the delegated scope (action, order, amount, currency).
     within_scope: true
+    # A refund must name a positive amount and an order.
+    require_amount: true
     evidence:
       # Refunds above this amount need a trusted delivery attestation for the
       # same order, otherwise a human decides.
