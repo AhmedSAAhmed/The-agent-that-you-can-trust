@@ -22,6 +22,11 @@ _REFUND = re.compile(
 )
 _HANDOFF = re.compile(r"\b(human|real person|a person|representative|someone real|manager)\b|موظف|انسان|شخص", re.I)
 _CANCEL = re.compile(r"\bcancel|الغاء|إلغاء|كنسل", re.I)
+_SMALLTALK = re.compile(
+    r"^\W*(hi|hello|hey|good (morning|afternoon|evening)|thanks?( you)?|thx|cheers|bye|goodbye|ok(ay)?|great)\b"
+    r"|مرحب|السلام|هلا|اهلا|أهلا|شكر|مشكور|يعطيك العافي|مع السلام",
+    re.I,
+)
 _LOOKUP = re.compile(r"where\s+is|track|status|has\s+.*shipped|وين|تتبع|حالة", re.I)
 
 _NUM = r"(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{1,2}))?"
@@ -62,7 +67,7 @@ class ParsedRequest:
         if not self.intent:
             return "I couldn't tell what you're asking for."
         bits = {"refund.request": "refund", "order.lookup": "order lookup", "order.cancel": "cancellation",
-                "human.handoff": "request for a person"}.get(self.intent, self.intent)
+                "human.handoff": "request for a person", "smalltalk": "greeting or thanks"}.get(self.intent, self.intent)
         if self.amount is not None:
             bits += f" of {self.currency} {self.amount:g}"
         bits += f" on order #{self.order}" if self.order else " (no order number found)"
@@ -90,6 +95,8 @@ def parse(text: str) -> ParsedRequest:
         p.intent = "human.handoff"
     elif _LOOKUP.search(clean):
         p.intent = "order.lookup"
+    elif _SMALLTALK.search(clean) and not re.search(r"\d", clean):
+        p.intent = "smalltalk"
 
     amounts: list[tuple[float, str, tuple[int, int]]] = []
     for m in _AMOUNT.finditer(clean):

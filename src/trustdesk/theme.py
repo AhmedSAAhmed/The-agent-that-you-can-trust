@@ -112,6 +112,8 @@ body,.gradio-container{{font-feature-settings:"ss01";-webkit-font-smoothing:anti
 .td-decision{{padding:20px 22px;border:1px solid var(--td-border);margin-bottom:0}}
 .td-decision.td-ACCEPT{{background:var(--td-ok-bg)}}.td-decision.td-REFUSE{{background:var(--td-bad-bg)}}
 .td-decision.td-ESCALATE{{background:var(--td-warn-bg)}}.td-decision.td-BLOCKED{{background:var(--td-mist)}}
+.td-decision.td-CLARIFY,.td-decision.td-CHAT{{background:var(--td-mist)}}
+.td-CLARIFY .td-badge,.td-CHAT .td-badge{{color:var(--td-blue)}}
 .td-badge{{font-size:.72rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}}
 .td-ACCEPT .td-badge{{color:var(--td-ok)}}.td-REFUSE .td-badge{{color:var(--td-bad)}}.td-ESCALATE .td-badge{{color:var(--td-warn)}}.td-BLOCKED .td-badge{{color:var(--td-blue)}}
 .td-reason{{font-size:1.35rem;font-weight:400;letter-spacing:-.015em;line-height:1.25;margin-top:6px;color:var(--td-ink)}}

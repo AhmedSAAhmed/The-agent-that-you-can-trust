@@ -12,7 +12,8 @@ from .policy import Decision
 
 from .theme import CSS  # noqa: E402,F401  (re-exported for app.py)
 
-ICON = {"ACCEPT": "✅ ACCEPT", "REFUSE": "⛔ REFUSE", "ESCALATE": "🧑‍💼 ESCALATE TO HUMAN", "BLOCKED": "🛡️ BLOCKED"}
+ICON = {"ACCEPT": "✅ ACCEPT", "REFUSE": "⛔ REFUSE", "ESCALATE": "🧑‍💼 ESCALATE TO HUMAN", "BLOCKED": "🛡️ BLOCKED",
+        "CLARIFY": "💬", "CHAT": "💬"}
 
 GROUPS = [
     ("reader", "0 · Reading the message", "AI or rule-based reader; every number must be found in the message"),
@@ -21,6 +22,7 @@ GROUPS = [
     ("authority_chain", "3 · Authority", "Traced back to Souq Bloom; can only narrow at each hand-off"),
     ("evidence", "4 · Evidence", "Delivery attestation from a courier we trust"),
     ("policy", "5 · Policy decision", "Rules from policies/support_agent.yaml"),
+    ("conversation", "Conversation", "Memory is for reading only; every request is still verified and decided by policy"),
     ("approval", "Signed supervisor decision", "Genuine signature, right person, right escalation, not reused"),
     ("authority", "Authority of the other agent", "Is it authorized by Souq Bloom?"),
     ("supervisor", "Supervisor authority", "Merchant-issued SupervisorCredential"),
@@ -38,6 +40,7 @@ PRETTY = {
     "mode": "reader", "understood": "understood as", "order_grounded": "order found in the message",
     "amount_grounded": "amount found in the message", "instructions_ignored": "instructions treated as data",
     "request_complete": "request complete", "handoff": "handed to a person",
+    "clarify": "asked a question", "chat": "small talk",
 }
 
 
@@ -77,13 +80,14 @@ def checklist(trace: list[CheckResult], *, open_all: bool = False) -> str:
     return "".join(out)
 
 
-VERB = {"ACCEPT": "Accepted", "REFUSE": "Refused", "ESCALATE": "Escalated to a human", "BLOCKED": "Blocked"}
+VERB = {"ACCEPT": "Accepted", "REFUSE": "Refused", "ESCALATE": "Escalated to a human", "BLOCKED": "Blocked",
+        "CLARIFY": "Asking a question, nothing decided yet", "CHAT": "Conversation, nothing to decide"}
 
 TILES = [  # (label, title, groups it covers)
     ("01", "Identity", ("message",)),
     ("02", "Credentials", ("presentation",)),
     ("03", "Authority", ("authority_chain",)),
-    ("04", "Decision", ("reader", "evidence", "policy")),
+    ("04", "Decision", ("reader", "evidence", "policy", "conversation")),
 ]
 
 
@@ -111,7 +115,8 @@ def decision_panel(decision: Decision | None, *, extra: list[CheckResult] | None
     trace = (extra or []) + decision.trace
     return (f"<div class='td-decision td-{decision.outcome}'><div class='td-badge'>/// {e(VERB.get(decision.outcome, decision.outcome))}</div>"
             f"<div class='td-reason'>{e(decision.reason)}</div><div class='td-req'>{e(decision.request.describe())} · "
-            f"{sum(c.passed for c in trace)}/{len(trace)} checks passed · no scores, only evidence and policy</div></div>"
+            f"{sum(c.passed for c in trace)}/{len(trace)} checks passed · "
+            f"{'the sender was verified before anything was shared' if decision.outcome in ('CLARIFY', 'CHAT') else 'no scores, only evidence and policy'}</div></div>"
             + tiles(trace) + checklist(trace))
 
 
@@ -121,10 +126,10 @@ def outcome_banner(outcome: str, headline: str, sub: str = "") -> str:
 
 
 def hero(repo: str) -> str:
-    stats = [("10", "/10", "Attacks defended", "Each caught by a named check"),
+    stats = [("11", "/11", "Attacks defended", "Each caught by a named check"),
              ("0", "", "Scores", "Evidence and policy only"),
              ("4", "", "W3C standards", "DID, VC 2.0, Data Integrity, Status List"),
-             ("159", "", "Tests", "Including the W3C test vector")]
+             ("182", "", "Tests", "Including the W3C test vector")]
     cells = "".join(f"<div class='td-stat'><div class='n'>{n}<span>{u}</span></div><div class='l'>{e(l)}</div>"
                     f"<div class='d'>{e(d)}</div></div>" for n, u, l, d in stats)
     return (f"<div class='td-hero'><div class='td-nav'><span class='td-logo'>TRUSTDESK</span>"

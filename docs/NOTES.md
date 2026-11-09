@@ -9,7 +9,7 @@
 1. **Live desk:** click the *AED 380* example. The support agent **escalates**: Layla delegated up to AED 400, but its own credential stops at AED 300. The tile row shows which step failed and why.
 2. **Escalations:** approve as Noura. Her decision is itself signed and checked against her SupervisorCredential.
 3. **Live desk:** *Layla revokes her assistant*, then resend. The result is **REFUSE**, citing `authority_chain.link1.status`.
-4. **Attack Lab:** *Run all 10*. Each attack names the exact check that stopped it.
+4. **Attack Lab:** *Run all 11*. Each attack names the exact check that stopped it.
 5. **Verify a credential:** load the tampered example (limit 400 → 4000) and watch the signature check fail.
 
 ## Key decisions
@@ -20,6 +20,7 @@
 - **Escalate, don't just refuse.** Requests the customer allowed but the agent itself isn't authorized for go to a human, and the human's decision is signed and verified too.
 - **Mutual trust.** Before sharing order data, Layla's assistant verifies that the support agent really holds Souq Bloom's credential. A phishing bot fails this check.
 - **The reader proposes, the policy disposes.** An optional AI reader (OpenRouter) understands messy text; its output must pass a pydantic schema and a grounding check (every number must be in the message, or computed from our order records), or the request goes to a human. Without a key, a deterministic rule-based reader is used. No LLM ever makes the decision, and nothing requires a paid API.
+- **Conversational, but trust is per message.** The agent asks for missing details and replies in English or Gulf Arabic. Memory is used only to read the customer's own words, only after verification, and each completed request is decided from scratch. AI-written replies must match the decision's outcome and numbers, or a template is used.
 - **One fresh world per visitor** on the live demo, so judges don't interfere with each other.
 
 ## AI tools used
@@ -41,7 +42,7 @@
 
 ```bash
 uv sync
-uv run pytest -q                 # 159 tests
+uv run pytest -q                 # 182 tests
 uv run python -m trustdesk.demo  # CLI walkthrough
 uv run python app.py             # UI at http://localhost:7860
 ```

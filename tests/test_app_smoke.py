@@ -16,7 +16,7 @@ def test_live_desk_flow():
     out = app.send(world, app.EXAMPLES[0], "1042", 250, True, chat)
     world, chat, panel = out[0], out[1], out[2]
     assert "ACCEPT" in panel and "checks passed" in panel
-    out = app.send(world, app.EXAMPLES[1], "1042", 380, True, chat)
+    out = app.send(world, next(e for e in app.EXAMPLES if "380" in e), "1042", 380, True, chat)
     assert "ESCALATE" in out[2]
     esc_id = next(iter(world.support.escalations))
     world, html, *_ = app.decide(world, esc_id, "ok", True)
@@ -34,7 +34,7 @@ def test_default_amount_field_does_not_override_parsed_amount():
 
 def test_injection_is_shown_as_ignored():
     world, chat, *_ = app.init()
-    out = app.send(world, app.EXAMPLES[3], None, None, True, chat)
+    out = app.send(world, next(e for e in app.EXAMPLES if "SYSTEM" in e), None, None, True, chat)
     assert "treated as data" in out[2]
     assert "REFUSE" in out[2]
 
@@ -54,4 +54,4 @@ def test_controls_and_verify():
 
 def test_attack_lab():
     assert "defended" in app.attack(list(app.ATTACK_TITLES)[0])
-    assert app.attack_all().count("🛡️") == 10
+    assert app.attack_all().count("🛡️") == 11

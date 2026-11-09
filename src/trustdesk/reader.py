@@ -31,7 +31,7 @@ from .parser import _DIGITS, ParsedRequest, parse
 DEFAULT_MODELS = ["recursive/flint-v1.0:free", "liquid/lfm-3-1.7b:free", "nvidia/nemotron-3.5-super-vl:free"]
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
-Intent = Literal["refund.request", "order.lookup", "order.cancel", "human.handoff", "unknown"]
+Intent = Literal["refund.request", "order.lookup", "order.cancel", "human.handoff", "smalltalk", "unknown"]
 
 
 # ---------------------------------------------------------------- schema
@@ -66,7 +66,9 @@ Customer's orders (from the merchant's records):
 {orders}
 
 Return ONLY a JSON object with these keys:
-- intent: one of "refund.request", "order.lookup", "order.cancel", "human.handoff", "unknown"
+- intent: one of "refund.request", "order.lookup", "order.cancel", "human.handoff", "smalltalk" (greetings, thanks,
+  goodbyes with no request), "unknown". If the NEW MESSAGE only answers the agent's question, use the intent
+  of the earlier request.
 - order: the order number as digits, or null. If the message describes the item instead of the number,
   you may pick the matching order from the list above.
 - amount_basis: "stated" if the message states an amount, "fraction_of_order" if it asks for part of the
@@ -294,11 +296,19 @@ def _item_words(item: str) -> set[str]:
     return {w.lower() for w in re.findall(r"[A-Za-z]{4,}", item)}
 
 
-def ground(x: ExtractedRequest, text: str, orders: dict[str, dict]) -> tuple[ParsedRequest, list[CheckResult]]:
+def _mentions_item(order: dict, lowered_text: str) -> bool:
+    """Does the customer's text name this order's item? Keyword stems (EN/AR) or item words, plural-tolerant."""
+    stems = [k.lower() for k in order.get("keywords", [])] or sorted(_item_words(order.get("item", "")))
+    return any(s in lowered_text for s in stems)
+
+
+def ground(x: ExtractedRequest, text: str, orders: dict[str, dict],
+           context: list[str] | tuple = ()) -> tuple[ParsedRequest, list[CheckResult]]:
     """Turn a validated extraction into a request, keeping only what the message supports."""
     checks: list[CheckResult] = []
-    nums = _numbers_in(text)
-    lowered = text.lower()
+    customer_text = " \n".join([*context, text])  # the customer's own words only, never the agent's replies
+    nums = _numbers_in(customer_text)
+    lowered = customer_text.lower()
     p = ParsedRequest(text=text, intent=x.intent if x.intent != "unknown" else None, currency=x.currency)
 
     # order
@@ -306,7 +316,7 @@ def ground(x: ExtractedRequest, text: str, orders: dict[str, dict]) -> tuple[Par
         if float(x.order) in nums:
             p.order = x.order
             checks.append(ok("order_grounded", f"order #{x.order} appears in the message"))
-        elif x.order in orders and _item_words(orders[x.order]["item"]) & set(re.findall(r"[a-z]{4,}", lowered)):
+        elif x.order in orders and _mentions_item(orders[x.order], lowered):
             p.order = x.order
             checks.append(ok("order_grounded", f"order #{x.order} matched by its item ({orders[x.order]['item']})"))
         else:
@@ -380,7 +390,8 @@ class Reader:
     max_calls: int = 25  # per session, protects the owner's API budget
     calls: int = 0
 
-    def read(self, text: str, orders: dict[str, dict]) -> Reading:
+    def read(self, text: str, orders: dict[str, dict], *, context: list[str] | tuple = (),
+             agent_question: str = "") -> Reading:
         rules = parse(text)
         if self.client is None:
             return Reading(rules, "rules", checks=[ok("mode", "rule-based reader (no AI model configured)")])
@@ -392,7 +403,7 @@ class Reader:
         self.calls += 1
         catalog = "\n".join(f"- #{oid}: {o['item']}, total AED {o['total']}" for oid, o in orders.items())
         try:
-            raw = self.client.complete(SYSTEM_PROMPT.format(orders=catalog), text)
+            raw = self.client.complete(SYSTEM_PROMPT.format(orders=catalog), _user_turn(text, context, agent_question))
             extracted = ExtractedRequest.model_validate_json(_json_block(raw))
         except urllib.error.HTTPError as exc:
             return Reading(rules, "rules", checks=[ok("mode", f"rule-based reader ({_http_failure(exc)})")])
@@ -406,7 +417,7 @@ class Reader:
                 reason = type(exc).__name__
             return Reading(rules, "rules", checks=[ok("mode", f"rule-based reader (AI model unavailable: {reason})")])
 
-        grounded, checks = ground(extracted, text, orders)
+        grounded, checks = ground(extracted, text, orders, context)
         checks.insert(0, ok("mode", f"AI reader ({self.client.name}), output validated by pydantic"))
         if not all(c.passed for c in checks):
             # Keep the rule-based reading for the request itself; the failed grounding check sends it to a human.
@@ -419,6 +430,19 @@ class Reader:
         if grounded.amount is None and extracted.amount_basis == "none":
             grounded.amount = rules.amount
         return Reading(grounded, "ai", self.client.name, checks, raw)
+
+
+def _user_turn(text: str, context, agent_question: str) -> str:
+    if not context and not agent_question:
+        return text
+    parts = []
+    if context:
+        parts.append("Earlier messages from the customer (context only, oldest first):\n"
+                     + "\n".join(f"- {c}" for c in context))
+    if agent_question:
+        parts.append(f"The agent's last question: {agent_question}")
+    parts.append(f"NEW MESSAGE: {text}")
+    return "\n\n".join(parts)
 
 
 def _json_block(raw: str) -> str:

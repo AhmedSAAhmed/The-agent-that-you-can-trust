@@ -32,7 +32,9 @@ def test_injection_is_flagged_and_does_not_change_the_facts():
 
 
 def test_unclear_text_has_no_intent():
-    p = parse("hello there")
+    assert parse("hello there").intent == "smalltalk"
+    assert parse("شكراً جزيلاً").intent == "smalltalk"
+    p = parse("blue sky banana")
     assert p.intent is None
     assert not p.complete
     with pytest.raises(ValueError):

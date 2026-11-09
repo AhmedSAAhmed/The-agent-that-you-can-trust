@@ -20,6 +20,7 @@ from .identity import Identity
 from .parser import ParsedRequest, parse
 from .policy import Policy
 from .reader import Reader
+from .replies import Replier
 from .status_list import StatusList, StatusRegistry
 
 POLICY_PATH = Path(__file__).resolve().parents[2] / "policies" / "support_agent.yaml"
@@ -104,7 +105,8 @@ class World:
         return self.names.get(did, f"unknown ({did[:20]}…)")
 
 
-def build_world(now: datetime | None = None, *, reader: Reader | None = None) -> World:
+def build_world(now: datetime | None = None, *, reader: Reader | None = None,
+                replier: Replier | None = None) -> World:
     """reader: pass Reader(OpenRouterClient.from_env()) to enable the AI reader; default is rule-based."""
     now = now or utcnow()
     merchant, layla = _id("Souq Bloom"), _id("Layla")
@@ -152,9 +154,13 @@ def build_world(now: datetime | None = None, *, reader: Reader | None = None) ->
 
     directory = {"souq_bloom": merchant.did, "swiftdrop": courier_id.did}
     policy = Policy.load(POLICY_PATH, directory)
-    orders = {o["id"]: {"item": o["item"], "total": o["total"]} for o in creds["customer"]["credentialSubject"]["orders"]}
+    # The merchant's own records: credential data plus search keywords (English and Arabic) for its catalogue.
+    keywords = {"1042": ["vase", "ceramic", "peon", "flower", "مزهري", "فازة", "فاز", "سيراميك", "ورد"],
+                "1043": ["candle", "oud", "gift box", "شمع", "شموع", "عود", "بخور"]}
+    orders = {o["id"]: {"item": o["item"], "total": o["total"], "keywords": keywords.get(o["id"], [])}
+              for o in creds["customer"]["credentialSubject"]["orders"]}
     support = SupportAgent(support_id, authority=creds["support_authority"], policy=policy, status_registry=registry,
-                           orders=orders, reader=reader or Reader())
+                           orders=orders, reader=reader or Reader(), replier=replier or Replier())
     assistant = AssistantAgent(assistant_id, authority=[creds["customer"], creds["delegation"]],
                                merchant_did=merchant.did, status_registry=registry)
     assistant.evidence = [creds["attestation"]]

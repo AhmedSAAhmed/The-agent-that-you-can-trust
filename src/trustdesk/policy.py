@@ -17,6 +17,8 @@ from .credentials import CheckResult, StatusChecker, fail, issuer_id, ok, verify
 from .delegation import Scope, scope_allows
 
 ACCEPT, REFUSE, ESCALATE = "ACCEPT", "REFUSE", "ESCALATE"
+# Not decisions: the agent is asking a question or making conversation. Nothing is logged.
+CLARIFY, CHAT = "CLARIFY", "CHAT"
 
 
 @dataclass(frozen=True)
@@ -161,14 +163,21 @@ class Policy:
             trace.append(ok("policy.handoff", rule.get("handoff_reason", "this request is handled by a person")))
             return done(ESCALATE, rule.get("handoff_reason", "handing over to a member of our team"))
 
-        # 2. well-formed request
+        # 2. an order outside the requester's authority is refused for that reason first
+        if rule.get("within_scope") and ev.delegated_scope is not None and req.order \
+                and not ev.delegated_scope.covers_order(req.order):
+            s = scope_allows(ev.delegated_scope, req.action, req.order, req.amount, req.currency)
+            trace.append(CheckResult("policy.scope", s.passed, s.detail))
+            return done(REFUSE, s.detail)
+
+        # 3. well-formed request
         if rule.get("require_amount"):
             if req.amount <= 0 or not req.order:
                 trace.append(fail("policy.request_complete", "a refund needs an order number and a positive amount"))
                 return done(REFUSE, "the request does not say which order or how much to refund")
             trace.append(ok("policy.request_complete", f"order #{req.order}, {req.currency} {req.amount:g}"))
 
-        # 3. scope
+        # 4. scope
         if rule.get("within_scope"):
             if ev.delegated_scope is None:
                 trace.append(fail("policy.scope", "no delegated scope"))

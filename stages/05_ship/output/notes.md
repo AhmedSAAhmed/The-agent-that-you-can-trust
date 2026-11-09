@@ -21,6 +21,11 @@
 - Benchmark: Groq gpt-oss-120b and qwen3.8-27b, and Gemini flash-lite read all 3 genuine hard messages and *obeyed* the injection (caught by grounding); Gemini 2.5 Flash got 4/4 (~2 s). Groq answers in 0.3–0.8 s.
 - 159 tests, all with faked network.
 
+## Conversation layer (added 2026-11-09)
+- `conversation.py`: per-sender memory (customer text only, after verification), pending request + clarifying questions, small talk, language detection; `replies.Replier` writes AI replies checked by `consistent()`.
+- Merchant order records carry EN/AR keywords so items ("vases", "الشمعة") identify orders.
+- Attack 11 `forged_transcript`. Live-tested multi-turn flows in English and Arabic on the free Groq chain. 182 tests.
+
 ## Left for the owner
 1. Review `docs/THESIS.md` in your own voice.
 2. Record the 90 s video using `docs/loom-script.md` on the live URL.

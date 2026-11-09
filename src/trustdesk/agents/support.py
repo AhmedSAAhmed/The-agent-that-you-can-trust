@@ -15,9 +15,11 @@ from ..credentials import CheckResult, add_proof, fail, issuer_id, ok, utcnow, v
 from ..delegation import Scope, scope_allows, scope_of, verify_chain
 from ..envelope import verify_envelope
 from ..identity import Identity, controller_of
+from ..conversation import Conversation, clarifying_question, detect_language, missing_slots, smalltalk_reply
+from ..parser import ParsedRequest
 from ..reader import Reader
-from ..policy import ACCEPT, ESCALATE, Decision, Evidence, Policy, Request
-from ..replies import reply_text
+from ..policy import ACCEPT, CHAT, CLARIFY, ESCALATE, Decision, Evidence, Policy, Request
+from ..replies import Replier
 from .base import Agent, order_chain, types_of
 
 
@@ -36,7 +38,7 @@ class Escalation:
 class HandleResult:
     decision: Decision
     reply: dict
-    receipt: dict
+    receipt: dict | None
     escalation: Escalation | None = None
     request_text: str = ""
 
@@ -57,11 +59,13 @@ class SupportAgent(Agent):
     service = "Souq Bloom customer support"
 
     def __init__(self, identity: Identity, *, authority: dict, policy: Policy, status_registry,
-                 orders: dict[str, dict] | None = None, reader: Reader | None = None):
+                 orders: dict[str, dict] | None = None, reader: Reader | None = None, replier: Replier | None = None):
         super().__init__(identity)
         self.authority = authority
         self.orders = orders or {}  # the merchant's own order records (item, total)
         self.reader = reader or Reader()
+        self.replier = replier or Replier()
+        self.conversations: dict[str, Conversation] = {}  # per sender DID
         self.policy = policy
         self.registry = status_registry
         self.escalations: dict[str, Escalation] = {}
@@ -106,17 +110,46 @@ class SupportAgent(Agent):
 
         body = env.get("body") or {}
         text = str(body.get("text", ""))
+        convo = self.conversations.setdefault(sender, Conversation())
+        # Conversation features (memory, questions, small talk) exist only for verified senders.
+        verified = all(c.passed for g in ("message", "presentation", "authority_chain") for c in groups[g])
+        lang = detect_language(text) if text.strip() else convo.lang
         request = _explicit_request(body)
+        parsed: ParsedRequest | None = None
+        grounded = True
         if request is not None:
             groups["reader"] = [ok("mode", "structured request supplied and signed by the sender")]
         else:
-            reading = self.reader.read(text, self.orders)
-            parsed = reading.parsed
-            request = parsed.to_request() if parsed.intent else Request(action="unknown")
+            reading = self.reader.read(text, self.orders, context=convo.context() if verified else (),
+                                       agent_question=convo.last_question if verified else "")
+            parsed, grounded = reading.parsed, reading.grounded
+            if verified:
+                # Pending details were grounded when the customer gave them; an ungrounded new reading
+                # keeps that context (so it escalates) but contributes no new values of its own.
+                parsed = convo.merge(parsed)
+                if grounded:
+                    parsed = convo.answer_slots(parsed, text, self.orders)
+            request = parsed.to_request() if parsed.intent and parsed.intent != "smalltalk" else Request(action="unknown")
             groups["reader"] = reading.checks + [ok("understood", parsed.understood())]
             if parsed.ignored_instructions:
                 groups["reader"].append(ok("instructions_ignored",
                                            f"treated as data, not commands: “{parsed.ignored_instructions[0][:100]}”"))
+        if verified and text.strip():
+            convo.note_customer(text)
+
+        if verified and parsed is not None and grounded:
+            allowed = self._allowed_orders(chain_result.scope)
+            if parsed.intent == "smalltalk":
+                return self._converse(CHAT, smalltalk_reply(text, lang), groups, parsed, sender, lang, now)
+            missing = missing_slots(parsed)
+            outside_scope = parsed.order is not None and parsed.order not in allowed
+            # No request type yet: always ask kindly. Missing details: ask, unless the order isn't theirs.
+            if missing and (parsed.intent is None or (not outside_scope and parsed.intent in ("refund.request", "order.lookup"))):
+                question = clarifying_question(missing, parsed, allowed, lang)
+                convo.hold(parsed, question)
+                return self._converse(CLARIFY, question, groups, parsed, sender, lang, now)
+        convo.clear()
+
         evidence = Evidence(
             request=request, now=now, groups=groups,
             delegated_scope=chain_result.scope, own_authority=self.own_authority(now),
@@ -140,10 +173,30 @@ class SupportAgent(Agent):
         )
         reply = self.send(sender, {
             "kind": "decision", "outcome": decision.outcome, "reason": decision.reason,
-            "text": reply_text(decision, escalation_id=escalation.id if escalation else None),
+            "text": self.replier.write(decision, escalation_id=escalation.id if escalation else None, lang=lang),
             "receipt": receipt["proof"]["proofValue"][:16],
         }, now=now)
         return HandleResult(decision, reply, receipt, escalation, text)
+
+    # ---------------------------------------------------------------- conversation helpers
+    def _allowed_orders(self, scope: Scope | None) -> dict[str, dict]:
+        """Orders the requester may act on: never reveal others in a question."""
+        if scope is None:
+            return {}
+        return {oid: o for oid, o in self.orders.items() if scope.covers_order(oid)}
+
+    def _converse(self, outcome: str, message: str, groups: dict, parsed: ParsedRequest, sender: str,
+                  lang: str, now: datetime) -> HandleResult:
+        """A question or a pleasantry: nothing is decided, so nothing is written to the action log."""
+        trace = [CheckResult(f"{g}.{c.name}", c.passed, c.detail) for g, cs in groups.items() for c in cs]
+        trace.append(ok(f"conversation.{outcome.lower()}",
+                        "asked for the missing details; nothing decided yet" if outcome == CLARIFY
+                        else "greeting or thanks; nothing to decide"))
+        request = Request(action=parsed.intent or "unknown", order=parsed.order, amount=parsed.amount or 0.0,
+                          currency=parsed.currency)
+        decision = Decision(outcome, message, trace, request)
+        reply = self.send(sender, {"kind": outcome.lower(), "text": message, "lang": lang}, now=now)
+        return HandleResult(decision, reply, None, None, parsed.text)
 
     # ---------------------------------------------------------------- human in the loop
     def resolve(self, escalation_id: str, approval: dict, supervisor_credential: dict,

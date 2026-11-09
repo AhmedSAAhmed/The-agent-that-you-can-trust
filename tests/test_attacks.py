@@ -13,6 +13,7 @@ EXPECTED = {
     "prompt_injection": "policy.scope",
     "fake_support": "authority.trust_anchor",
     "manipulated_reader": "reader.amount_grounded",
+    "forged_transcript": "policy.own_authority",
 }
 
 
