@@ -31,7 +31,8 @@ A trust layer for AI agents (DIDs, Verifiable Credentials, revocation, scoped de
 - Use real crypto (`cryptography` Ed25519). Never hand-roll primitives.
 - Write tests first for every verification rule and attack.
 - When a stage finishes, write its `output/check.md` and `output/notes.md`, then update the status line in `stages/CONTEXT.md`.
-- After `pip`/`uv add`, regenerate `requirements.txt` (`uv export --no-hashes --no-dev --no-emit-project --format requirements-txt -o requirements.txt`).
+- `requirements.txt` (used by Hugging Face Spaces) lists direct dependencies only, with no exact pins and no Gradio. Never regenerate it with `uv export`: full pins clash with the Space's own Gradio install.
+- Deploy: `git push origin main` (GitHub) and `git push space main` (huggingface.co/spaces/SalQ/trustdesk).
 - Commits are authored by the owner only: never add `Co-Authored-By` or other AI attribution trailers.
 - Commit and push only when the owner asks. Remote: `origin` = github.com/AhmedSAAhmed/The-agent-that-you-can-trust, branch `main`.
 
