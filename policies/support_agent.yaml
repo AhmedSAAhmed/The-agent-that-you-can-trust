@@ -1,0 +1,41 @@
+# Souq Bloom support agent: who may ask for what, and when a human decides.
+# Names (souq_bloom, swiftdrop) are resolved to DIDs by the scenario directory.
+# There is no score anywhere: every outcome follows from a named rule below.
+
+policy: souq-bloom-support
+version: 1
+
+# Only authority that traces back to these issuers counts.
+trust_anchors: [souq_bloom]
+
+# Couriers whose delivery attestations we accept as evidence.
+trusted_attesters: [swiftdrop]
+
+vouches:
+  # An attester not listed above is trusted only with this many vouches
+  # issued by trust anchors. Vouches from anyone else are shown, never counted.
+  min_from_anchors: 2
+
+actions:
+  refund.request:
+    # Any failed check in these groups means REFUSE.
+    must_pass: [message, presentation, authority_chain]
+    # The request must fit the delegated scope (action, order, amount, currency).
+    within_scope: true
+    evidence:
+      # Refunds above this amount need a trusted delivery attestation for the
+      # same order, otherwise a human decides.
+      delivery_attestation_above: 100
+      supporting_statuses: [delivered_damaged, not_delivered]
+    # Auto-approve up to the agent's own AuthorityCredential limit.
+    auto_approve_up_to: own_authority
+    own_action: refund.issue
+    # Within the customer's delegation but above my own authority: ask a human.
+    otherwise: escalate
+
+  order.lookup:
+    must_pass: [message, presentation, authority_chain]
+    within_scope: true
+
+# Anything not listed above is refused.
+default: refuse

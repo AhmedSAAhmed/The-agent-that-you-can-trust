@@ -1,6 +1,6 @@
 # TrustDesk - the build pipeline
 
-**Status (2026-11-09):** `01_crypto_core` passed (36 tests, W3C vector matched). Next: start `02_trust_logic`.
+**Status (2026-11-09):** `01_crypto_core` and `02_trust_logic` passed (89 tests). Next: start `03_agents_demo`.
 
 The flow in one line: sign it, reason about it, stage it between agents, show it, ship it.
 
