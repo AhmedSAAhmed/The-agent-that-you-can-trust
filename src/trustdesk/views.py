@@ -15,7 +15,7 @@ from .theme import CSS  # noqa: E402,F401  (re-exported for app.py)
 ICON = {"ACCEPT": "✅ ACCEPT", "REFUSE": "⛔ REFUSE", "ESCALATE": "🧑‍💼 ESCALATE TO HUMAN", "BLOCKED": "🛡️ BLOCKED"}
 
 GROUPS = [
-    ("parser", "0 · Reading the message", "What was understood; instructions inside the text are treated as data"),
+    ("reader", "0 · Reading the message", "AI or rule-based reader; every number must be found in the message"),
     ("message", "1 · Identity", "Is the sender who they claim? Signed, fresh, not replayed"),
     ("presentation", "2 · Credentials", "Presented by their holder, bound to this exact message"),
     ("authority_chain", "3 · Authority", "Traced back to Souq Bloom; can only narrow at each hand-off"),
@@ -35,6 +35,9 @@ PRETTY = {
     "validity_period": "within validity period", "status": "not revoked", "scope": "within delegated scope",
     "own_authority": "within my own authority", "delivery_evidence": "delivery evidence", "attester_trusted": "attester trusted",
     "attestation_valid": "attestation valid", "action": "action permitted",
+    "mode": "reader", "understood": "understood as", "order_grounded": "order found in the message",
+    "amount_grounded": "amount found in the message", "instructions_ignored": "instructions treated as data",
+    "request_complete": "request complete", "handoff": "handed to a person",
 }
 
 
@@ -80,7 +83,7 @@ TILES = [  # (label, title, groups it covers)
     ("01", "Identity", ("message",)),
     ("02", "Credentials", ("presentation",)),
     ("03", "Authority", ("authority_chain",)),
-    ("04", "Decision", ("evidence", "policy")),
+    ("04", "Decision", ("reader", "evidence", "policy")),
 ]
 
 
@@ -118,10 +121,10 @@ def outcome_banner(outcome: str, headline: str, sub: str = "") -> str:
 
 
 def hero(repo: str) -> str:
-    stats = [("9", "/9", "Attacks defended", "Each caught by a named check"),
+    stats = [("10", "/10", "Attacks defended", "Each caught by a named check"),
              ("0", "", "Scores", "Evidence and policy only"),
              ("4", "", "W3C standards", "DID, VC 2.0, Data Integrity, Status List"),
-             ("117", "", "Tests", "Including the W3C test vector")]
+             ("146", "", "Tests", "Including the W3C test vector")]
     cells = "".join(f"<div class='td-stat'><div class='n'>{n}<span>{u}</span></div><div class='l'>{e(l)}</div>"
                     f"<div class='d'>{e(d)}</div></div>" for n, u, l, d in stats)
     return (f"<div class='td-hero'><div class='td-nav'><span class='td-logo'>TRUSTDESK</span>"

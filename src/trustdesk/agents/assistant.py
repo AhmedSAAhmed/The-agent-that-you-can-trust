@@ -42,6 +42,8 @@ class AssistantAgent(Agent):
 
     def request(self, to: str, *, text: str, parsed: ParsedRequest | None = None, request: Request | None = None,
                 include_evidence: bool = True, now: datetime | None = None, extra_credentials: list[dict] | None = None) -> dict:
+        # Only an explicit request (e.g. fields the user edited) is signed into the body;
+        # otherwise the support agent reads the free text itself.
         req = request or (parsed.to_request() if parsed and parsed.intent else None)
         body: dict = {"kind": "request", "text": text}
         if req:

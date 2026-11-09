@@ -20,6 +20,8 @@ _REFUND = re.compile(
     r"|استرداد|استرجاع|ارجاع|رجع(?:وا)?\s*(?:لي\s*)?(?:ال)?فلوس|تعويض",
     re.I,
 )
+_HANDOFF = re.compile(r"\b(human|real person|a person|representative|someone real|manager)\b|موظف|انسان|شخص", re.I)
+_CANCEL = re.compile(r"\bcancel|الغاء|إلغاء|كنسل", re.I)
 _LOOKUP = re.compile(r"where\s+is|track|status|has\s+.*shipped|وين|تتبع|حالة", re.I)
 
 _NUM = r"(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{1,2}))?"
@@ -59,7 +61,8 @@ class ParsedRequest:
     def understood(self) -> str:
         if not self.intent:
             return "I couldn't tell what you're asking for."
-        bits = {"refund.request": "refund", "order.lookup": "order lookup"}.get(self.intent, self.intent)
+        bits = {"refund.request": "refund", "order.lookup": "order lookup", "order.cancel": "cancellation",
+                "human.handoff": "request for a person"}.get(self.intent, self.intent)
         if self.amount is not None:
             bits += f" of {self.currency} {self.amount:g}"
         bits += f" on order #{self.order}" if self.order else " (no order number found)"
@@ -81,6 +84,10 @@ def parse(text: str) -> ParsedRequest:
 
     if _REFUND.search(clean):
         p.intent = "refund.request"
+    elif _CANCEL.search(clean):
+        p.intent = "order.cancel"
+    elif _HANDOFF.search(clean):
+        p.intent = "human.handoff"
     elif _LOOKUP.search(clean):
         p.intent = "order.lookup"
 

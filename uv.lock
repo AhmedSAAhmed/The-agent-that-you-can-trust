@@ -1736,6 +1736,7 @@ dependencies = [
     { name = "cryptography" },
     { name = "gradio" },
     { name = "jcs" },
+    { name = "pydantic" },
     { name = "pyyaml" },
 ]
 
@@ -1758,6 +1759,7 @@ requires-dist = [
     { name = "gradio", specifier = ">=5.0" },
     { name = "huggingface-hub", marker = "extra == 'llm'", specifier = ">=0.25" },
     { name = "jcs", specifier = ">=0.2.1" },
+    { name = "pydantic", specifier = ">=2" },
     { name = "pyyaml", specifier = ">=6.0" },
 ]
 provides-extras = ["llm"]

@@ -123,7 +123,14 @@ class Policy:
         def done(outcome: str, reason: str) -> Decision:
             return Decision(outcome, reason, trace, req)
 
+        # How the message was read (AI or rules) is always part of the trace.
+        reader_checks = ev.groups.get("reader", [])
+        trace.extend(CheckResult(f"reader.{c.name}", c.passed, c.detail) for c in reader_checks)
+
         rule = (self.spec.get("actions") or {}).get(req.action)
+        if rule is None and req.action == "unknown":
+            trace.append(fail("policy.action", "the message could not be understood as a request"))
+            return done(REFUSE, "I couldn't tell what you're asking for. Please mention the order number and what you need")
         if rule is None:
             trace.append(fail("policy.action", f"no rule permits '{req.action}' (default: {self.spec.get('default', 'refuse')})"))
             return done(REFUSE, f"'{req.action}' is not something I'm allowed to do")
@@ -142,6 +149,17 @@ class Policy:
                     first_failure = labelled
         if first_failure:
             return done(REFUSE, f"{first_failure.name}: {first_failure.detail}")
+
+        # 1b. A reading the message doesn't support goes to a human.
+        if rule.get("reader_must_be_grounded"):
+            bad = next((c for c in reader_checks if not c.passed), None)
+            if bad:
+                return done(ESCALATE, f"needs a human: I couldn't read the message reliably ({bad.detail})")
+
+        # 1c. some requests always go to a person
+        if rule.get("handoff"):
+            trace.append(ok("policy.handoff", rule.get("handoff_reason", "this request is handled by a person")))
+            return done(ESCALATE, rule.get("handoff_reason", "handing over to a member of our team"))
 
         # 2. well-formed request
         if rule.get("require_amount"):

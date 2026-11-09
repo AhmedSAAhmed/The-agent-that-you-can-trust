@@ -19,6 +19,7 @@ from .delegation import Scope, delegate
 from .identity import Identity
 from .parser import ParsedRequest, parse
 from .policy import Policy
+from .reader import Reader
 from .status_list import StatusList, StatusRegistry
 
 POLICY_PATH = Path(__file__).resolve().parents[2] / "policies" / "support_agent.yaml"
@@ -87,11 +88,13 @@ class World:
     # ---------------------------------------------------------------- interactions
     def ask(self, text: str, *, parsed: ParsedRequest | None = None, include_evidence: bool = True,
             now: datetime | None = None) -> tuple[ParsedRequest, dict, HandleResult]:
-        """Layla's assistant sends `text` to the support agent; returns (parsed, envelope, result)."""
-        parsed = parsed or parse(text)
+        """Layla's assistant sends `text` to the support agent; returns (preview, envelope, result).
+
+        Pass `parsed` only for an explicit, user-corrected request; otherwise the support agent reads the text.
+        """
         env = self.assistant.request(self.support.did, text=text, parsed=parsed,
                                      include_evidence=include_evidence, now=now or self.clock())
-        return parsed, env, self.support.handle(env, now=now or self.clock())
+        return parsed or parse(text), env, self.support.handle(env, now=now or self.clock())
 
     def decide(self, escalation_id: str, *, approved: bool, note: str = ""):
         approval = self.supervisor.sign_decision(escalation_id, approved=approved, note=note, now=self.clock())
@@ -101,7 +104,8 @@ class World:
         return self.names.get(did, f"unknown ({did[:20]}…)")
 
 
-def build_world(now: datetime | None = None) -> World:
+def build_world(now: datetime | None = None, *, reader: Reader | None = None) -> World:
+    """reader: pass Reader(OpenRouterClient.from_env()) to enable the AI reader; default is rule-based."""
     now = now or utcnow()
     merchant, layla = _id("Souq Bloom"), _id("Layla")
     support_id, assistant_id = _id("Souq Bloom Support Agent"), _id("Layla's Assistant")
@@ -148,7 +152,9 @@ def build_world(now: datetime | None = None) -> World:
 
     directory = {"souq_bloom": merchant.did, "swiftdrop": courier_id.did}
     policy = Policy.load(POLICY_PATH, directory)
-    support = SupportAgent(support_id, authority=creds["support_authority"], policy=policy, status_registry=registry)
+    orders = {o["id"]: {"item": o["item"], "total": o["total"]} for o in creds["customer"]["credentialSubject"]["orders"]}
+    support = SupportAgent(support_id, authority=creds["support_authority"], policy=policy, status_registry=registry,
+                           orders=orders, reader=reader or Reader())
     assistant = AssistantAgent(assistant_id, authority=[creds["customer"], creds["delegation"]],
                                merchant_did=merchant.did, status_registry=registry)
     assistant.evidence = [creds["attestation"]]

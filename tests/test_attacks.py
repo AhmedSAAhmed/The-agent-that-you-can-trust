@@ -12,6 +12,7 @@ EXPECTED = {
     "sybil": "evidence.attester_trusted",
     "prompt_injection": "policy.scope",
     "fake_support": "authority.trust_anchor",
+    "manipulated_reader": "reader.amount_grounded",
 }
 
 

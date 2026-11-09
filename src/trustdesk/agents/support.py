@@ -15,7 +15,7 @@ from ..credentials import CheckResult, add_proof, fail, issuer_id, ok, utcnow, v
 from ..delegation import Scope, scope_allows, scope_of, verify_chain
 from ..envelope import verify_envelope
 from ..identity import Identity, controller_of
-from ..parser import parse
+from ..reader import Reader
 from ..policy import ACCEPT, ESCALATE, Decision, Evidence, Policy, Request
 from ..replies import reply_text
 from .base import Agent, order_chain, types_of
@@ -41,25 +41,27 @@ class HandleResult:
     request_text: str = ""
 
 
-def _request_from_body(body: dict) -> tuple[Request, str]:
-    text = str(body.get("text", ""))
+def _explicit_request(body: dict) -> Request | None:
+    """A structured request the sender chose to sign into the message (e.g. fields the user edited)."""
     r = body.get("request")
-    if isinstance(r, dict) and r.get("action"):
-        try:
-            return Request(action=str(r["action"]), order=str(r["order"]) if r.get("order") else None,
-                           amount=float(r.get("amount") or 0), currency=str(r.get("currency") or "AED")), text
-        except (TypeError, ValueError):
-            return Request(action="malformed"), text
-    parsed = parse(text)
-    return (parsed.to_request() if parsed.intent else Request(action="unknown")), text
+    if not (isinstance(r, dict) and r.get("action")):
+        return None
+    try:
+        return Request(action=str(r["action"]), order=str(r["order"]) if r.get("order") else None,
+                       amount=float(r.get("amount") or 0), currency=str(r.get("currency") or "AED"))
+    except (TypeError, ValueError):
+        return Request(action="malformed")
 
 
 class SupportAgent(Agent):
     service = "Souq Bloom customer support"
 
-    def __init__(self, identity: Identity, *, authority: dict, policy: Policy, status_registry):
+    def __init__(self, identity: Identity, *, authority: dict, policy: Policy, status_registry,
+                 orders: dict[str, dict] | None = None, reader: Reader | None = None):
         super().__init__(identity)
         self.authority = authority
+        self.orders = orders or {}  # the merchant's own order records (item, total)
+        self.reader = reader or Reader()
         self.policy = policy
         self.registry = status_registry
         self.escalations: dict[str, Escalation] = {}
@@ -102,7 +104,19 @@ class SupportAgent(Agent):
                                     now=now, status_registry=self.registry)
         groups["authority_chain"] = chain_result.checks
 
-        request, text = _request_from_body(env.get("body") or {})
+        body = env.get("body") or {}
+        text = str(body.get("text", ""))
+        request = _explicit_request(body)
+        if request is not None:
+            groups["reader"] = [ok("mode", "structured request supplied and signed by the sender")]
+        else:
+            reading = self.reader.read(text, self.orders)
+            parsed = reading.parsed
+            request = parsed.to_request() if parsed.intent else Request(action="unknown")
+            groups["reader"] = reading.checks + [ok("understood", parsed.understood())]
+            if parsed.ignored_instructions:
+                groups["reader"].append(ok("instructions_ignored",
+                                           f"treated as data, not commands: “{parsed.ignored_instructions[0][:100]}”"))
         evidence = Evidence(
             request=request, now=now, groups=groups,
             delegated_scope=chain_result.scope, own_authority=self.own_authority(now),

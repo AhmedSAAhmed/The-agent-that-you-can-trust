@@ -54,4 +54,4 @@ def test_controls_and_verify():
 
 def test_attack_lab():
     assert "defended" in app.attack(list(app.ATTACK_TITLES)[0])
-    assert app.attack_all().count("🛡️") == 9
+    assert app.attack_all().count("🛡️") == 10

@@ -22,6 +22,8 @@ actions:
     must_pass: [message, presentation, authority_chain]
     # The request must fit the delegated scope (action, order, amount, currency).
     within_scope: true
+    # If the AI reader's output isn't supported by the message itself, a human decides.
+    reader_must_be_grounded: true
     # A refund must name a positive amount and an order.
     require_amount: true
     evidence:
@@ -37,7 +39,19 @@ actions:
 
   order.lookup:
     must_pass: [message, presentation, authority_chain]
+    reader_must_be_grounded: true
     within_scope: true
+
+  # Verified customers can always reach a person; cancellations are a human call.
+  human.handoff:
+    must_pass: [message, presentation, authority_chain]
+    handoff: true
+    handoff_reason: "the customer asked for a person: handing over with the verified context"
+
+  order.cancel:
+    must_pass: [message, presentation, authority_chain]
+    handoff: true
+    handoff_reason: "cancellations are reviewed by our team"
 
 # Anything not listed above is refused.
 default: refuse
