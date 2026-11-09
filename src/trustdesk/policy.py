@@ -171,8 +171,10 @@ class Policy:
                 trace.append(fail("policy.own_authority", "I hold no authority credential for this"))
                 return done(REFUSE, "I am not authorized to act on this")
             mine = scope_allows(own, own_action, None, req.amount, req.currency)
-            trace.append(CheckResult("policy.own_authority", mine.passed,
-                                     mine.detail if mine.passed else f"above my own authority: {mine.detail}"))
+            trace.append(CheckResult(
+                "policy.own_authority", mine.passed,
+                f"within my own authority ({own.currency} {own.max_amount:g})" if mine.passed
+                else f"{req.currency} {req.amount:g} is above my own authority limit ({own.currency} {own.max_amount:g})"))
             if not mine.passed:
                 if rule.get("otherwise") == "escalate":
                     return done(ESCALATE, f"allowed by the customer's delegation, but above my own limit "

@@ -1,6 +1,6 @@
 # TrustDesk - the build pipeline
 
-**Status (2026-11-09):** `01_crypto_core` and `02_trust_logic` passed (89 tests). Next: start `03_agents_demo`.
+**Status (2026-11-09):** stages 01–03 passed (111 tests; `uv run python -m trustdesk.demo` works). Next: start `04_ui`.
 
 The flow in one line: sign it, reason about it, stage it between agents, show it, ship it.
 
