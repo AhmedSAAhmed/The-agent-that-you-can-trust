@@ -1,5 +1,7 @@
 # TrustDesk - the build pipeline
 
+**Status (2026-11-09):** scaffold done and pushed. Next: start `01_crypto_core`. No stage has passed yet.
+
 The flow in one line: sign it, reason about it, stage it between agents, show it, ship it.
 
 | Stage | Job |
