@@ -1,6 +1,6 @@
 # TrustDesk - the build pipeline
 
-**Status (2026-11-09):** scaffold done and pushed. Next: start `01_crypto_core`. No stage has passed yet.
+**Status (2026-11-09):** `01_crypto_core` passed (36 tests, W3C vector matched). Next: start `02_trust_logic`.
 
 The flow in one line: sign it, reason about it, stage it between agents, show it, ship it.
 

@@ -32,6 +32,7 @@ A trust layer for AI agents (DIDs, Verifiable Credentials, revocation, scoped de
 - Write tests first for every verification rule and attack.
 - When a stage finishes, write its `output/check.md` and `output/notes.md`, then update the status line in `stages/CONTEXT.md`.
 - After `pip`/`uv add`, regenerate `requirements.txt` (`uv export --no-hashes --no-dev --no-emit-project --format requirements-txt -o requirements.txt`).
+- Commits are authored by the owner only: never add `Co-Authored-By` or other AI attribution trailers.
 - Commit and push only when the owner asks. Remote: `origin` = github.com/AhmedSAAhmed/The-agent-that-you-can-trust, branch `main`.
 
 ## The one rule
