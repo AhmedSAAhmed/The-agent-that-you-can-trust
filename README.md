@@ -70,13 +70,6 @@ uv run python app.py             # UI at http://localhost:7860
 
 No API keys or paid services are needed. The optional AI reader turns on when any of `GROQ_API_KEY`, `GEMINI_API_KEY` or `OPENROUTER_API_KEY` is set (all free tiers; see `.env.example`). Without them, a rule-based reader is used.
 
-## Docs
-
-- [Architecture: identity → claims → verification → policy](docs/architecture.md)
-- [Two-year thesis on agent identity and reputation](docs/THESIS.md)
-- [Notes: what to look at, decisions, AI tools used, out of scope](docs/NOTES.md)
-- [90-second video script](docs/loom-script.md)
-
 ## Repo map
 
 `src/trustdesk/` the trust layer and agents · `policies/` trust policy · `tests/` 182 tests · `app.py` Gradio UI · `stages/` + `AGENTS.md` the build pipeline (ICM workspace), so any coding agent can resume work.
